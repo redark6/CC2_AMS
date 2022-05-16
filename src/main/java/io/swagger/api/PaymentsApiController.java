@@ -2,14 +2,21 @@ package io.swagger.api;
 
 import io.swagger.model.Payment;
 import io.swagger.model.PaymentResponse;
+import io.swagger.model.PaymentResponseDTO;
 import io.swagger.model.UniquePaymentKey;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.annotations.*;
 import io.swagger.repository.PaymentRedisRepository;
+import io.swagger.service.PaymentRedisService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
+import org.springframework.boot.autoconfigure.cache.CacheAutoConfiguration;
+import org.springframework.cache.annotation.CacheConfig;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
@@ -22,6 +29,10 @@ import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
+@EnableCaching
+@ImportAutoConfiguration(classes = {
+        CacheAutoConfiguration.class,
+})
 @javax.annotation.Generated(value = "io.swagger.codegen.languages.SpringCodegen", date = "2022-05-16T06:10:14.366Z")
 @Configuration
 @Controller
@@ -33,10 +44,10 @@ public class PaymentsApiController implements PaymentsApi {
 
     private final HttpServletRequest request;
 
-    private final PaymentRedisRepository paymentRedis;
+    private final PaymentRedisService paymentRedis;
 
     @org.springframework.beans.factory.annotation.Autowired
-    public PaymentsApiController(ObjectMapper objectMapper, HttpServletRequest request, PaymentRedisRepository paymentRedis) {
+    public PaymentsApiController(ObjectMapper objectMapper, HttpServletRequest request, PaymentRedisService paymentRedis) {
         this.objectMapper = objectMapper;
         this.request = request;
         this.paymentRedis = paymentRedis;
@@ -48,11 +59,11 @@ public class PaymentsApiController implements PaymentsApi {
         return new ResponseEntity<UniquePaymentKey>(key,HttpStatus.OK);
     }
 
-    @Cacheable(value = "PaymentResponse")
-    public ResponseEntity<PaymentResponse> processPayment(@ApiParam(value = "The unique payment key to make action idempotent",required=true) @PathVariable("payment_unique_key") String paymentUniqueKey,@ApiParam(value = "Payment object that needs to be processed" ,required=true )  @Valid @RequestBody Payment body) {
+    public ResponseEntity<PaymentResponseDTO> processPayment(@ApiParam(value = "The unique payment key to make action idempotent",required=true) @PathVariable("payment_unique_key") String paymentUniqueKey, @ApiParam(value = "Payment object that needs to be processed" ,required=true )  @Valid @RequestBody Payment body) {
         Optional<PaymentResponse> savedResponse = this.paymentRedis.findById(paymentUniqueKey);
         if(savedResponse.isPresent() && savedResponse.get().getStatus() != PaymentResponse.StatusEnum.ERROR){
-            return new ResponseEntity(savedResponse,HttpStatus.OK);
+            PaymentResponseDTO response = new PaymentResponseDTO(savedResponse.get());
+            return new ResponseEntity(response,HttpStatus.OK);
         }else {
             PaymentResponse paymentResponse = new PaymentResponse();
             paymentResponse.setPaymentId(paymentUniqueKey);
@@ -70,7 +81,8 @@ public class PaymentsApiController implements PaymentsApi {
             // for the asynchronous way we suppose this payment object will be modified in the cache and DB after the success / failure of the request
             // the associated service should save the payment response to keep it in database ( simulation )
             this.paymentRedis.save(paymentResponse);
-            return new ResponseEntity<PaymentResponse>(paymentResponse,HttpStatus.CREATED);
+            PaymentResponseDTO response = new PaymentResponseDTO(paymentResponse);
+            return new ResponseEntity<PaymentResponseDTO>(response,HttpStatus.CREATED);
         }
     }
 

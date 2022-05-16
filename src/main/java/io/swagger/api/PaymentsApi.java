@@ -7,6 +7,7 @@ package io.swagger.api;
 
 import io.swagger.model.Payment;
 import io.swagger.model.PaymentResponse;
+import io.swagger.model.PaymentResponseDTO;
 import io.swagger.model.UniquePaymentKey;
 import io.swagger.annotations.*;
 import org.springframework.http.ResponseEntity;
@@ -41,12 +42,12 @@ public interface PaymentsApi {
 
     @ApiOperation(value = "process the payment of transaction between a user and seller(s)", nickname = "processPayment", notes = "", response = PaymentResponse.class, tags={ "payment", })
     @ApiResponses(value = { 
-        @ApiResponse(code = 200, message = "successful operation", response = PaymentResponse.class),
+        @ApiResponse(code = 200, message = "successful operation", response = PaymentResponseDTO.class),
         @ApiResponse(code = 405, message = "Invalid input") })
     @RequestMapping(value = "/payments/{payment_unique_key}",
         produces = { "application/json" }, 
         consumes = { "application/json" },
         method = RequestMethod.POST)
-    ResponseEntity<PaymentResponse> processPayment(@ApiParam(value = "The unique payment key to make action idempotent",required=true) @PathVariable("payment_unique_key") String paymentUniqueKey,@ApiParam(value = "Payment object that needs to be processed" ,required=true )  @Valid @RequestBody Payment body);
+    ResponseEntity<PaymentResponseDTO> processPayment(@ApiParam(value = "The unique payment key to make action idempotent",required=true) @PathVariable("payment_unique_key") String paymentUniqueKey, @ApiParam(value = "Payment object that needs to be processed" ,required=true )  @Valid @RequestBody Payment body);
 
 }
