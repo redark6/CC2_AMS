@@ -8,6 +8,7 @@ import io.swagger.annotations.*;
 import io.swagger.repository.PaymentRedisRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -47,6 +48,7 @@ public class PaymentsApiController implements PaymentsApi {
         return new ResponseEntity<UniquePaymentKey>(key,HttpStatus.OK);
     }
 
+    @Cacheable(value = "PaymentResponse")
     public ResponseEntity<PaymentResponse> processPayment(@ApiParam(value = "The unique payment key to make action idempotent",required=true) @PathVariable("payment_unique_key") String paymentUniqueKey,@ApiParam(value = "Payment object that needs to be processed" ,required=true )  @Valid @RequestBody Payment body) {
         Optional<PaymentResponse> savedResponse = this.paymentRedis.findById(paymentUniqueKey);
         if(savedResponse.isPresent() && savedResponse.get().getStatus() != PaymentResponse.StatusEnum.ERROR){
