@@ -1,0 +1,59 @@
+
+@startuml
+
+Client -> PaymentSytem: ask system to give unique id key
+PaymentSytem -> Client: return unique id key for payment
+
+Client -> PaymentSytem:  request to process payment ( given datas) 
+note right
+  The given object is invalid
+  ----
+  Sytem process payment and fail
+  ----
+  System save an instance of the result in a redis (database and UUID key)
+  ----
+  System send the result object
+end note
+
+PaymentSytem -> Client:  payement Failed 
+Client -> PaymentSytem:  retry payment
+note right
+  The client retry the request with the same UUID key
+  and invalid datas
+  ----
+  Sytem retrieve the existing from cache and see that status is error
+  ----
+  System retry to process payment with data given in the request
+  and fail (not cache because client could have updated datas)
+  ----
+  System save the new result (update database and cache based on UUID key)
+  ----
+  System send the result object
+end note
+
+PaymentSytem -> Client:  payement Failed 
+Client -> PaymentSytem:  retry payment
+note right
+  The client retry the request with the same UUID key
+  and valid datas
+  ----
+  Sytem retrieve the existing from cache and see that status is error
+  ----
+  System retry to process payment with data given in the request
+  and succees (not cache because client could have updated datas)
+  ----
+  System save the new result (update database and cache based on UUID key)
+  ----
+  System send the result object
+end note
+PaymentSytem -> Client:  payement Succeed 
+Client -> PaymentSytem:  retry payment
+note right
+  The client retry the request with the same UUID key
+  and valid datas ( we suppose it did not get the previous system reponse)
+  ----
+  Sytem retrieve the existing from cache and see that status is success
+  ----
+  System send the result object from the cache
+end note
+@enduml
