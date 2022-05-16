@@ -1,0 +1,161 @@
+swagger: "2.0"
+info:
+  description: "This is the server for the v1 of payment cc2 exercice of micro service architecture"
+  version: "2.0.0"
+  title: "Swagger Payment"
+  contact:
+    email: "redhachoulim@gmail.com"
+  license:
+    name: "Apache 2.0"
+    url: "http://www.apache.org/licenses/LICENSE-2.0.html"
+host: "localhost:9000"
+basePath: "/v1"
+tags:
+- name: "payment"
+  description: "Everything about payment actions"
+schemes:
+- "https"
+- "http"
+paths:
+  /payments/{payment_unique_key}:
+    post:
+      tags:
+      - "payment"
+      summary: "process the payment of transaction between a user and seller(s)"
+      description: ""
+      operationId: "processPayment"
+      consumes:
+      - "application/json"
+      produces:
+      - "application/json"
+      parameters:
+      - name: "payment_unique_key"
+        in: "path"
+        description: "The unique payment key to make action idempotent"
+        required: true
+        type: "string"
+      
+      - in: "body"
+        name: "body"
+        description: "Payment object that needs to be processed"
+        required: true
+        schema:
+          $ref: "#/definitions/Payment"
+      responses:
+        "405":
+          description: "Invalid input"
+        "200":
+          description: "successful operation"
+          schema:
+            $ref: "#/definitions/PaymentResponse"
+  /payments/askforpaymentkey:
+    get:
+      tags:
+      - "payment"
+      summary: "give a unique id key to realize a payment"
+      description: ""
+      operationId: "obtainKey"
+      consumes:
+      - "application/json"
+      produces:
+      - "application/json"
+      responses:
+        "201":
+          description: "successful operation"
+          schema:
+            $ref: "#/definitions/UniquePaymentKey"        
+            
+
+    
+definitions:
+  Payment:
+    type: "object"
+    properties:
+    
+      buyer_info:
+        $ref: '#/definitions/UserInfos'
+
+      checkout_id:
+        type: "string"
+        
+      credit_card_info:
+        $ref: '#/definitions/CreditCardInfos'
+
+      payment_orders:
+        type: "array"
+        xml:
+          name: "payment_order"
+          wrapped: true
+        items:
+          $ref: "#/definitions/PaymentOrder"
+
+    xml:
+      name: "Payment"
+      
+  UserInfos:
+    type: "object"
+    properties:
+      first_name:
+        type: "string"
+      last_name:
+        type: "string"
+      email:
+        type: "string"
+      phone:
+        type: "string"
+    xml:
+      name: "UserInfos"
+      
+  CreditCardInfos:
+    type: "object"
+    properties:
+      card_code:
+        type: "string"
+      expiration_date:
+        type: "string"
+      possessor_name:
+        type: "string"
+      secret_code:
+        type: "string"
+    xml:
+      name: "CreditCardInfos"
+      
+      
+  PaymentOrder:
+    type: "object"
+    properties:
+      seller_account:
+        type: "string"
+      amount:
+        type: "string"
+      currency:
+        type: "string"
+      payment_order_id:
+        type: "string"
+    xml:
+      name: "PaymentOrder"
+      
+  UniquePaymentKey:
+    type: "object"
+    properties:
+      key:
+        type: "string"
+    xml:
+      name: "UniquePaymentKey"
+      
+  PaymentResponse:
+    type: "object"
+    properties:
+      payment_id:
+        type: "string"
+      status:
+        type: "string"
+        description: "Payment Status"
+        enum:
+        - "success"
+        - "processing"
+        - "error"
+      date:
+        type: "string"
+      resultat:
+        type: "string"

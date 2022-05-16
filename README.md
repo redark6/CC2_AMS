@@ -13,6 +13,157 @@ The underlying library integrating swagger to SpringBoot is [springfox](https://
 Start your server as an simple java application  
 
 You can view the api documentation in swagger-ui by pointing to  
-http://localhost:8080/  
-
+http://localhost:8080/
 Change default port value in application.properties
+
+
+Pour realiser ce cc2, j'ai utiliser swagger pour écrire le contrat open api du syteme de paiement.
+Celui-ci est joint au format yaml en tant que swagger.yaml
+Le projet à ensuite été generer grâce à swagger sous format spring (car java c'est génial et spring c'est magique)
+Certaine partie on été modifier par rapport à la structure original pour les besoin d'implémentation de redis et du cache
+
+Pour le choix structurel j'ai mis au point deux endpoint
+-v1/payments/askforpaymentkey:
+    Fournit une clé unique pour réaliser et identifier le paiement 
+    Il assure le bon fonctionnement du retry et l'indempotence
+    pour l'end point de paiement 
+    A terme il faudrait créer une table pour verifier
+    que les clées aient bien été émise par notre system
+    et en conserver une trace qui soit décorréler de l'objet 
+-v1/payments/{payment_unique_key}
+    Il sert à proceder au faux payment d'une transaction dont l'objet
+    est celui qui nous à été donner dans le fichier du
+    un exemple fonctionnel est donner en dessous.
+    cette end point appelle un service qui s'occupe de sauvegarder
+    une réponse suite à l'execution du payment.
+    l'execution de payment n'est pas fait et non sauvegarder car
+    n'étant pas le sujet qui interresse ce cc2.
+    On se content de dire que le paiement est en erreur si l'attribut
+    checkout_id est null, sinon le paiement est validé.
+    Le cache lui est implementer sur la fonction qui
+    récupère nos résultat de paiement depuis redis
+    qui simule une base de donnée ici.
+    Si on appelle l'end point avec une clé qui n'a pas servis alors
+    on tente de proceder au payment, on sauvegarde le resultat en base
+    et on retourne la réponse.
+    Si on rappelle l'end point avec une clé qui à déjà
+    fournit un résultat alors l'objet seras récuperer du cache
+    et analyser pour déduire la conduite à suivre.
+    Si il contient le status d'erreur alors on relance la requette
+    de paiement avec les données fournit dans la requette (la nouvelle).
+    On sauvgarde le résulat et renvoie la réponse au client.
+    Si c'est un status succès alors on renvoie l'objet fournit par le cache.
+
+
+objet payment fonctionnel à mettre dans le body de la requette
+{
+"buyer_info": {
+"first_name": "string",
+"last_name": "string",
+"email": "string",
+"phone": "string"
+},
+"checkout_id": null,
+"credit_card_info": {
+"card_code": "string",
+"expiration_date": "string",
+"possessor_name": "string",
+"secret_code": "string"
+},
+"payment_orders": [
+{
+"seller_account": "string",
+"amount": "string",
+"currency": "string",
+"payment_order_id": "string"
+}
+]
+}
+
+Pour redis, j'ai utiliser un serveur docker car redis
+est allergique à windows. Rien de bien compliquer
+pour la mise en oeuvre. Il est possible de changer les informations
+de connection dans RedisConfig pour tester (mot de passe/hôte)
+
+Petite précision, j'ai fait en sorte que le cache soit vider à
+chaque restart car c'était plus pratique pour moi. cela est
+configurer dans la classe RedisConfig avec tout ce qui concerne redis
+
+
+Diagramme de séquence de fonctionnement du system de payment
+
+     ┌──────┐                                ┌────────────┐                                                                       
+     │Client│                                │PaymentSytem│                                                                       
+     └──┬───┘                                └─────┬──────┘                                                                       
+        │     ask system to give unique id key     │                                                                              
+        │ ─────────────────────────────────────────>                                                                              
+        │                                          │                                                                              
+        │     return unique id key for payment     │                                                                              
+        │ <─────────────────────────────────────────                                                                              
+        │                                          │                                                                              
+        │                                          │  ╔══════════════════════════════════════════════════════════════════════════╗
+        │                                          │  ║The given object is invalid                                              ░║
+        │                                          │  ║----                                                                      ║
+        │ request to process payment ( given datas)│  ║Sytem process payment and fail                                            ║
+        │ ─────────────────────────────────────────>  ║----                                                                      ║
+        │                                          │  ║System save an instance of the result in a redis (database and UUID key)  ║
+        │                                          │  ║----                                                                      ║
+        │                                          │  ║System send the result object                                             ║
+        │                                          │  ╚══════════════════════════════════════════════════════════════════════════╝
+        │              payement Failed             │                                                                              
+        │ <─────────────────────────────────────────                                                                              
+        │                                          │                                                                              
+        │                                          │  ╔══════════════════════════════════════════════════════════════════════════╗
+        │                                          │  ║The client retry the request with the same UUID key                      ░║
+        │                                          │  ║and invalid datas                                                         ║
+        │                                          │  ║----                                                                      ║
+        │                                          │  ║Sytem retrieve the existing from cache and see that status is error       ║
+        │               retry payment              │  ║----                                                                      ║
+        │ ─────────────────────────────────────────>  ║System retry to process payment with data given in the request            ║
+        │                                          │  ║and fail (not cache because client could have updated datas)              ║
+        │                                          │  ║----                                                                      ║
+        │                                          │  ║System save the new result (update database and cache based on UUID key)  ║
+        │                                          │  ║----                                                                      ║
+        │                                          │  ║System send the result object                                             ║
+        │                                          │  ╚══════════════════════════════════════════════════════════════════════════╝
+        │              payement Failed             │                                                                              
+        │ <─────────────────────────────────────────                                                                              
+        │                                          │                                                                              
+        │                                          │  ╔══════════════════════════════════════════════════════════════════════════╗
+        │                                          │  ║The client retry the request with the same UUID key                      ░║
+        │                                          │  ║and valid datas                                                           ║
+        │                                          │  ║----                                                                      ║
+        │                                          │  ║Sytem retrieve the existing from cache and see that status is error       ║
+        │               retry payment              │  ║----                                                                      ║
+        │ ─────────────────────────────────────────>  ║System retry to process payment with data given in the request            ║
+        │                                          │  ║and succees (not cache because client could have updated datas)           ║
+        │                                          │  ║----                                                                      ║
+        │                                          │  ║System save the new result (update database and cache based on UUID key)  ║
+        │                                          │  ║----                                                                      ║
+        │                                          │  ║System send the result object                                             ║
+        │                                          │  ╚══════════════════════════════════════════════════════════════════════════╝
+        │             payement Succeed             │                                                                              
+        │ <─────────────────────────────────────────                                                                              
+        │                                          │                                                                              
+        │                                          │  ╔══════════════════════════════════════════════════════════════════════════╗
+        │                                          │  ║The client retry the request with the same UUID key                      ░║
+        │               retry payment              │  ║and valid datas ( we suppose it did not get the previous system reponse)  ║
+        │ ─────────────────────────────────────────>  ║----                                                                      ║
+        │                                          │  ║Sytem retrieve the existing from cache and see that status is success     ║
+        │                                          │  ║----                                                                      ║
+        │                                          │  ║System send the result object from the cache                              ║
+     ┌──┴───┐                                ┌─────┴──╚══════════════════════════════════════════════════════════════════════════╝
+     │Client│                                │PaymentSytem│                                                                       
+     └──────┘                                └────────────┘                                                                       
+
+Information sur l'équipe:
+
+je sais pas trop quoi dire à part:
+chef de groupe: redha chouli
+developpeurs sous les ordres du chef: redha chouli
+manager: redha chouli
+readme master: redha chouli (désolé pour les fautes d'orthographe si vous en trouver)
+
+Ca fait pas beaucoup de membres mais ca permet de voire plus de choses.
+
+et c'est la fin de ce readme, on se retrouve bientôt pour la suite ...

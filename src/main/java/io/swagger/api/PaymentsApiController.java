@@ -77,9 +77,9 @@ public class PaymentsApiController implements PaymentsApi {
             }
             // for the payment i make it synchronous but we can make it asnchronous with "processing"
             // it is much better than the synchronous way but for this part we want synchronous
-            // so if you give a null checkoutid it will give the error status for the "proof of concept" but it should be up to the service to do thsi work normaly
+            // so if you give a null checkoutid it will give the error status (payment failed) for the "proof of concept" but it should be up to the service for doing this task normaly
             // for the asynchronous way we suppose this payment object will be modified in the cache and DB after the success / failure of the request
-            // the associated service should save the payment response to keep it in database ( simulation )
+            // the associated service save the payment response to keep it in database
             this.paymentRedis.save(paymentResponse);
             PaymentResponseDTO response = new PaymentResponseDTO(paymentResponse);
             return new ResponseEntity<PaymentResponseDTO>(response,HttpStatus.CREATED);
