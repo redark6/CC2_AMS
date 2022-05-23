@@ -156,14 +156,5 @@ Diagramme de séquence de fonctionnement du system de payment
      │Client│                                │PaymentSytem│                                                                       
      └──────┘                                └────────────┘                                                                       
 
-Information sur l'équipe:
-
-je sais pas trop quoi dire à part:
-chef de groupe: redha chouli
-developpeurs sous les ordres du chef: redha chouli
-manager: redha chouli
-readme master: redha chouli (désolé pour les fautes d'orthographe si vous en trouver)
-
-Ca fait pas beaucoup de membres mais ca permet de voire plus de choses.
 
 et c'est la fin de ce readme, on se retrouve bientôt pour la suite ...
